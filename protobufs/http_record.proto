@@ -1,0 +1,15 @@
+package HTTP_Record;
+
+message http_message {
+    required bytes first_line = 1;
+    repeated bytes headers = 2;
+    optional bytes body = 3;
+}
+
+message reqrespair {
+    required uint32 port = 1;
+    required string protocol = 2;
+    required string ip = 3;
+    required http_message req = 4;
+    required http_message res = 5;
+}
