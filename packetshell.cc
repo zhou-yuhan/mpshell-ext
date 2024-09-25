@@ -1,6 +1,7 @@
 /* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
 #include <utility>
+#include <memory>
 
 #include <sys/socket.h>
 #include <net/route.h>
@@ -20,37 +21,39 @@
 using namespace std;
 using namespace PollerShortNames;
 
-PacketShell::PacketShell( const std::string & device_prefix )
-    : egress_ingress( get_unassigned_address_pairs(2) ),
+PacketShell::PacketShell( const std::string & device_prefix, int if_num )
+    : egress_ingress( get_unassigned_address_pairs(if_num) ),
       nameserver_( first_nameserver() ),
-      egress_cell_tun_( device_prefix + "-cell-" + to_string( getpid() ) , egress_ingress.at(0).first, egress_ingress.at(0).second ),
-      egress_wifi_tun_( device_prefix + "-wifi-" + to_string( getpid() ) , egress_ingress.at(1).first, egress_ingress.at(1).second ),
-      dns_outside_( new DNSProxy( egress_ingress.at(0).first, nameserver_, nameserver_ ) ),
-      nat_cell_( egress_ingress.at(0).second ),
-      nat_wifi_( egress_ingress.at(1).second ),
-      cell_pipe_( make_pipe() ),
-      wifi_pipe_( make_pipe() ),
+      egress_tuns_(std::vector<TunDevice>()),
+      dns_outside_(),
+      nats_(),
+      pipes_(),
       child_processes_()
 {
     /* make sure environment has been cleared */
     assert( environ == nullptr );
 
-    /* constructor will throw exception if it fails, so we should not be able to get nullptr */
-    assert( dns_outside_ );
+    for (int i = 0; i < if_num; ++i) {
+        egress_tuns_.emplace_back(device_prefix + to_string(i), egress_ingress.at(i).first, egress_ingress.at(i).second);
+        nats_.emplace_back(std::unique_ptr<NAT>(new NAT(egress_ingress.at(i).second)));
+        pipes_.emplace_back(make_pipe());
+    }
+    dns_outside_ = std::unique_ptr<DNSProxy>(new DNSProxy(egress_ingress.at(0).first, nameserver_, nameserver_));
 }
 
 void PacketShell::start_uplink( const std::string & shell_prefix,
                                 char ** const user_environment,
-                                const uint64_t cell_delay,
-                                const uint64_t wifi_delay,
-                                const std::string & cell_uplink,
-                                const std::string & wifi_uplink,
+                                const std::vector<uint64_t> & delays,
+                                const std::vector<std::string> & uplinks,
                                 const vector< string > & command )
 {
     /* Fork */
     child_processes_.emplace_back( [&]() {
-            TunDevice ingress_cell_tun( "ingress-cell", egress_ingress.at(0).second, egress_ingress.at(0).first );
-            TunDevice ingress_wifi_tun( "ingress-wifi", egress_ingress.at(1).second, egress_ingress.at(1).first );
+            size_t if_num = delays.size();
+            std::vector<TunDevice> ingress_tuns;
+            for (size_t i = 0; i < if_num; ++i) {
+                ingress_tuns.emplace_back("ingress" + to_string(i), egress_ingress.at(i).second, egress_ingress.at(i).first);
+            }
             /* bring up localhost */
             Socket ioctl_socket( UDP );
             interface_ioctl( ioctl_socket.fd(), SIOCSIFFLAGS, "lo",
@@ -66,12 +69,14 @@ void PacketShell::start_uplink( const std::string & shell_prefix,
 
             SystemCall( "ioctl SIOCADDRT", ioctl( ioctl_socket.fd().num(), SIOCADDRT, &route ) );
 
-            /* Policy routing to simulate two default interfaces */
-            run( {"/sbin/ip", "route", "add", egress_ingress.at(1).first.ip(), "dev", "ingress-wifi", "src", egress_ingress.at(1).second.ip(), "table", "1"} );
-            run( {"/sbin/ip", "route", "add", "default", "via", egress_ingress.at(1).first.ip(), "dev", "ingress-wifi","table", "1"} );
-            run( {"/sbin/ip", "rule", "add", "from", egress_ingress.at(1).second.ip(),"table", "1"} );
-            run( {"/sbin/ip", "rule", "add", "to", egress_ingress.at(1).second.ip(), "table", "1"} );
-            run( {"/sbin/ip", "route", "flush", "cache"} );
+            for(size_t i = 1; i < if_num; ++i) {
+                /* Policy routing to simulate two default interfaces */
+                run( {"/sbin/ip", "route", "add", egress_ingress.at(i).first.ip(), "dev", "ingress" + to_string(i), "src", egress_ingress.at(i).second.ip(), "table", to_string(i)} );
+                run( {"/sbin/ip", "route", "add", "default", "via", egress_ingress.at(i).first.ip(), "dev", "ingress" + to_string(i), "table", to_string(i)} );
+                run( {"/sbin/ip", "rule", "add", "from", egress_ingress.at(i).second.ip(),"table", to_string(i)} );
+                run( {"/sbin/ip", "rule", "add", "to", egress_ingress.at(i).second.ip(), "table", to_string(i)} );
+                run( {"/sbin/ip", "route", "flush", "cache"} );
+            }
 
             /* create DNS proxy if nameserver address is local */
             auto dns_inside = DNSProxy::maybe_proxy( nameserver_,
@@ -81,6 +86,7 @@ void PacketShell::start_uplink( const std::string & shell_prefix,
             /* Fork again after dropping root privileges */
             drop_privileges();
 
+            std::vector<ChildProcess> uplink_processes;
             ChildProcess bash_process( [&]() {
                     /* restore environment and tweak bash prompt */
                     environ = user_environment;
@@ -91,48 +97,32 @@ void PacketShell::start_uplink( const std::string & shell_prefix,
                     //SystemCall( "execl", execl( shell.c_str(), shell.c_str(), "-c", program_name.c_str(), static_cast<const char*>( nullptr ) ) );
                     return EXIT_FAILURE;
                 } );
+            uplink_processes.emplace_back(move(bash_process));
 
-            ChildProcess cell_ferry( [&]() {
-                    RateDelayQueue cell_queue( cell_delay, cell_uplink );
-                    return packet_ferry( cell_queue, ingress_cell_tun.fd(), cell_pipe_.first,
-                                         move( dns_inside ),
-                                         {} );
-                } );
+            for (size_t i = 0; i < if_num; ++i) {
+                ChildProcess link_ferry( [&]() {
+                        RateDelayQueue link_queue( delays.at(i), uplinks.at(i) );
+                        return packet_ferry( link_queue, ingress_tuns.at(i).fd(), pipes_.at(i).first, i == 0 ? move( dns_inside ): nullptr, {} );
+                    } );
+                uplink_processes.emplace_back(move(link_ferry));
+            }
 
-            ChildProcess wifi_ferry( [&]() {
-                    RateDelayQueue wifi_queue( wifi_delay, wifi_uplink);
-                    return packet_ferry( wifi_queue, ingress_wifi_tun.fd(), wifi_pipe_.first,
-                                         nullptr,
-                                         {} );
-                } );
-            std::vector<ChildProcess> uplink_processes;
-            uplink_processes.emplace_back( move( bash_process ) );
-            uplink_processes.emplace_back( move( cell_ferry ) );
-            uplink_processes.emplace_back( move( wifi_ferry ) );
             return wait_on_processes( std::move( uplink_processes ) );
         }, true );  /* new network namespace */
 }
 
-void PacketShell::start_downlink( const uint64_t cell_delay,
-                                  const uint64_t wifi_delay,
-                                  const std::string & cell_downlink,
-                                  const std::string & wifi_downlink )
+void PacketShell::start_downlink( const std::vector<uint64_t> & delays,
+                                  const std::vector<std::string> & downlinks)
 {
-    child_processes_.emplace_back( [&] () {
+    size_t if_num = delays.size();
+    for (size_t i = 0; i < if_num; ++i) {
+        child_processes_.emplace_back( [&] () {
             drop_privileges();
+            RateDelayQueue link_queue(delays.at(i), downlinks.at(i));
+            return packet_ferry(link_queue, egress_tuns_.at(i).fd(), pipes_.at(i).second, i == 0 ? move(dns_outside_) : nullptr, {});
+        });
+    }
 
-            RateDelayQueue cell_queue( cell_delay, cell_downlink );
-            return packet_ferry( cell_queue, egress_cell_tun_.fd(),
-                                 cell_pipe_.second, move( dns_outside_ ), {} );
-        } );
-
-    child_processes_.emplace_back( [&] () {
-            drop_privileges();
-
-            RateDelayQueue wifi_queue( wifi_delay, wifi_downlink );
-            return packet_ferry( wifi_queue, egress_wifi_tun_.fd(),
-                                 wifi_pipe_.second, nullptr, {} );
-        } );
 }
 
 int PacketShell::wait_on_processes( std::vector<ChildProcess> && process_vector )
