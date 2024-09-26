@@ -25,7 +25,7 @@ public:
 
     std::string get_next( void );
 
-    int wait_time( void ) const;
+    unsigned int wait_time( void ) const;
 };
 
 #endif /* DELAY_QUEUE_HH */

@@ -10,8 +10,16 @@ common_source = exception.hh ezio.cc ezio.hh                                   \
 	get_address.hh get_address.cc                                          \
 	poller.hh poller.cc bytestream_queue.hh bytestream_queue.cc            \
 	read_write_interface.hh                                                \
-        cell_queue.hh cell_queue.cc                                            \
-        delay_queue.hh delay_queue.cc
+    cell_queue.hh cell_queue.cc                                            \
+    delay_queue.hh delay_queue.cc                                          \
+	json.hh                                                                \
+	abstract_packet_queue.hh queued_packet.hh                              \
+	infinite_packet_queue.hh                                               \
+	dropping_packet_queue.hh dropping_packet_queue.cc                      \
+	drop_head_packet_queue.hh drop_tail_packet_queue.hh                    \
+	codel_packet_queue.hh codel_packet_queue.cc                            \
+	pie_packet_queue.hh pie_packet_queue.cc                                \
+	link_queue.hh link_queue.cc                                            
 
 packet_shell_source = ferry.hh ferry.cc packetshell.cc packetshell.hh make_pipe.hh
 

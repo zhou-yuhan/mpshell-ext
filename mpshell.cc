@@ -1,7 +1,11 @@
 /* -*-mode:c++; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- */
 
-#include "packetshell.hh"
+#include <fstream>
 
+#include "packetshell.hh"
+#include "json.hh"
+
+using json = nlohmann::json;
 using namespace std;
 
 int main( int argc, char *argv[] )
@@ -13,23 +17,20 @@ int main( int argc, char *argv[] )
 
         check_requirements( argc, argv );
 
-        if ( argc < 6 ) {
-            throw Exception( "Usage", string( argv[ 0 ] ) + " if_num [delay uplink downlink] ... program" );
+        if ( argc < 3 ) {
+            throw Exception( "Usage", string( argv[ 0 ] ) + " config_file program" );
         }
 
-        const int if_num = myatoi(argv[1]);
         std::vector<uint64_t> delays;
         std::vector<std::string> uplinks;
         std::vector<std::string> downlinks;
-        int idx = 2;
-        for (int i = 0; i < if_num; ++i) {
-            delays.emplace_back(myatoi(argv[idx++]));
-            uplinks.emplace_back(argv[idx++]);
-            downlinks.emplace_back(argv[idx++]);
-        }
+        std::vector<json> queue_params;
+        std::string log_file = "";
+        get_config(argv[1], delays, uplinks, downlinks, queue_params, log_file);
+        int if_num = delays.size();
 
         vector< string > program_to_run;
-        for ( int num_args = 1 + if_num * 3 + 1; num_args < argc; num_args++ ) {
+        for ( int num_args = 2; num_args < argc; num_args++ ) {
             program_to_run.emplace_back( string( argv[ num_args ] ) );
         }
 
@@ -39,9 +40,11 @@ int main( int argc, char *argv[] )
                                    user_environment,
                                    delays,
                                    uplinks,
+                                   queue_params,
+                                   log_file,
                                    program_to_run);
 
-        mp_shell_app.start_downlink( delays, downlinks );
+        mp_shell_app.start_downlink( delays, downlinks, queue_params, log_file);
         return mp_shell_app.wait_for_exit();
     } catch ( const Exception & e ) {
         e.perror();

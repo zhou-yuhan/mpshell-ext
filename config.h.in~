@@ -1,0 +1,70 @@
+/* config.h.in.  Generated from configure.ac by autoheader.  */
+
+/* path to apache2 */
+#undef APACHE2
+
+/* path to dnsmasq */
+#undef DNSMASQ
+
+/* path to ip */
+#undef IP
+
+/* path to iptables */
+#undef IPTABLES
+
+/* path to apache2 mod_authz_core */
+#undef MOD_AUTHZ_CORE
+
+/* path to apache2 mod_cgi */
+#undef MOD_CGI
+
+/* path to apache2 mod_dir */
+#undef MOD_DIR
+
+/* path to apache2 mod_env */
+#undef MOD_ENV
+
+/* path to apache2 mod_mime */
+#undef MOD_MIME
+
+/* path to apache2 mod_mpm_prefork */
+#undef MOD_MPM_PREFORK
+
+/* path to apache2 mod_rewrite */
+#undef MOD_REWRITE
+
+/* path to apache2 mod_ssl */
+#undef MOD_SSL
+
+/* path to ssl certificate file */
+#undef MOD_SSL_CERTIFICATE_FILE
+
+/* path to ssl key */
+#undef MOD_SSL_KEY
+
+/* Name of package */
+#undef PACKAGE
+
+/* Define to the address where bug reports for this package should be sent. */
+#undef PACKAGE_BUGREPORT
+
+/* Define to the full name of this package. */
+#undef PACKAGE_NAME
+
+/* Define to the full name and version of this package. */
+#undef PACKAGE_STRING
+
+/* Define to the one symbol short name of this package. */
+#undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
+/* Define to the version of this package. */
+#undef PACKAGE_VERSION
+
+/* path to nph-replayserver.cgi */
+#undef REPLAYSERVER
+
+/* Version number of package */
+#undef VERSION

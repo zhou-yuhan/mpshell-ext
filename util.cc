@@ -16,7 +16,15 @@
 #include "exception.hh"
 #include "file_descriptor.hh"
 #include "poller.hh"
+#include "abstract_packet_queue.hh"
+#include "infinite_packet_queue.hh"
+#include "drop_head_packet_queue.hh"
+#include "drop_tail_packet_queue.hh"
+#include "codel_packet_queue.hh"
+#include "pie_packet_queue.hh"
+#include "json.hh"
 
+using json = nlohmann::json;
 using namespace std;
 using namespace PollerShortNames;
 
@@ -244,5 +252,45 @@ void assert_not_root( void )
     if ( ( getuid() == 0 ) or ( geteuid() == 0 )
          or ( getgid() == 0 ) or ( getegid() == 0 ) ) {
         throw Exception( "BUG", "privileges not dropped in sensitive region" );
+    }
+}
+
+std::unique_ptr<AbstractPacketQueue> get_packet_queue(const json & params)
+{
+    string type = params["type"];
+    if ( type == "infinite" ) {
+        return unique_ptr<AbstractPacketQueue>( new InfinitePacketQueue( params ) );
+    } else if ( type == "droptail" ) {
+        return unique_ptr<AbstractPacketQueue>( new DropTailPacketQueue( params ) );
+    } else if ( type == "drophead" ) {
+        return unique_ptr<AbstractPacketQueue>( new DropHeadPacketQueue( params ) );
+    } else if ( type == "codel" ) {
+        return unique_ptr<AbstractPacketQueue>( new CODELPacketQueue( params ) );
+    } else if ( type == "pie" ) {
+        return unique_ptr<AbstractPacketQueue>( new PIEPacketQueue( params ) );
+    } else {
+        cerr << "Unknown queue type: " << type << endl;
+    }
+
+    return nullptr;
+}
+
+void get_config(const char * filename, std::vector<uint64_t> & delays, std::vector<std::string> & uplinks, std::vector<std::string> & downlinks, std::vector<json> & queue_params, std::string & log_file)
+{
+    std::ifstream config_file(filename);
+    json config = json::parse(config_file);
+
+    size_t if_num = config["if_num"];
+    assert(if_num == config["if_configs"].size());
+
+    if (config.contains("log_file")) {
+        log_file = config["log_file"];
+    }
+
+    for (json& if_config: config["if_configs"]) {
+        delays.emplace_back(if_config["delay"]);
+        uplinks.emplace_back(if_config["uplink"]);
+        downlinks.emplace_back(if_config["downlink"]);
+        queue_params.emplace_back(if_config["queue_params"]);
     }
 }

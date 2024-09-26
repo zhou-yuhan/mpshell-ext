@@ -6,11 +6,14 @@
 #include <string>
 #include <cstring>
 #include <vector>
+#include <memory>
 
 #include "address.hh"
 #include "poller.hh"
 #include "signalfd.hh"
 #include "child_process.hh"
+#include "abstract_packet_queue.hh"
+#include "json.hh"
 
 std::string shell_path( void );
 void drop_privileges( void );
@@ -27,5 +30,7 @@ PollerShortNames::Result handle_signal( const signalfd_siginfo & sig,
                                         std::vector<ChildProcess> & child_processes );
 
 void assert_not_root( void );
+std::unique_ptr<AbstractPacketQueue> get_packet_queue(const nlohmann::json & params);
+void get_config(const char * filename, std::vector<uint64_t> & delays, std::vector<std::string> & uplinks, std::vector<std::string> & downlinks, std::vector<nlohmann::json> & queue_params, std::string & log_file);
 
 #endif /* UTIL_HH */

@@ -15,11 +15,13 @@
 #include "get_address.hh"
 #include "address.hh"
 #include "make_pipe.hh"
+#include "json.hh"
 
 #include "ferry.cc"
 
 using namespace std;
 using namespace PollerShortNames;
+using json = nlohmann::json;
 
 PacketShell::PacketShell( const std::string & device_prefix, int if_num )
     : egress_ingress( get_unassigned_address_pairs(if_num) ),
@@ -45,7 +47,9 @@ void PacketShell::start_uplink( const std::string & shell_prefix,
                                 char ** const user_environment,
                                 const std::vector<uint64_t> & delays,
                                 const std::vector<std::string> & uplinks,
-                                const vector< string > & command )
+                                const std::vector<json> & queue_params,
+                                const std::string & log_file,
+                                const std::vector< string > & command)
 {
     /* Fork */
     child_processes_.emplace_back( [&]() {
@@ -101,8 +105,10 @@ void PacketShell::start_uplink( const std::string & shell_prefix,
 
             for (size_t i = 0; i < if_num; ++i) {
                 ChildProcess link_ferry( [&]() {
-                        RateDelayQueue link_queue( delays.at(i), uplinks.at(i) );
-                        return packet_ferry( link_queue, ingress_tuns.at(i).fd(), pipes_.at(i).first, i == 0 ? move( dns_inside ): nullptr, {} );
+                        std::unique_ptr<AbstractPacketQueue> link_queue = get_packet_queue(queue_params.at(i));
+                        assert(link_queue);
+                        RateDelayQueue rate_delay_queue( delays.at(i), uplinks.at(i), log_file, true, move(link_queue));
+                        return packet_ferry( rate_delay_queue, ingress_tuns.at(i).fd(), pipes_.at(i).first, i == 0 ? move( dns_inside ) : nullptr, {} );
                     } );
                 uplink_processes.emplace_back(move(link_ferry));
             }
@@ -112,14 +118,17 @@ void PacketShell::start_uplink( const std::string & shell_prefix,
 }
 
 void PacketShell::start_downlink( const std::vector<uint64_t> & delays,
-                                  const std::vector<std::string> & downlinks)
+                                  const std::vector<std::string> & downlinks,
+                                  const std::vector<json> & queue_params,
+                                  const std::string & log_file)
 {
     size_t if_num = delays.size();
     for (size_t i = 0; i < if_num; ++i) {
         child_processes_.emplace_back( [&] () {
             drop_privileges();
-            RateDelayQueue link_queue(delays.at(i), downlinks.at(i));
-            return packet_ferry(link_queue, egress_tuns_.at(i).fd(), pipes_.at(i).second, i == 0 ? move(dns_outside_) : nullptr, {});
+            std::unique_ptr<AbstractPacketQueue> link_queue = get_packet_queue(queue_params.at(i));
+            RateDelayQueue rate_delay_queue(delays.at(i), downlinks.at(i), log_file, true, move(link_queue));
+            return packet_ferry(rate_delay_queue, egress_tuns_.at(i).fd(), pipes_.at(i).second, i == 0 ? move(dns_outside_) : nullptr, {});
         });
     }
 

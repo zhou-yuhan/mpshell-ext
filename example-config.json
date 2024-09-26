@@ -1,0 +1,45 @@
+{
+    "if_num": 4,
+    "log_file": "mpshell.log",
+    "if_configs": [
+        {
+            "delay": 200,
+            "uplink": "path/to/uplink1.trace",
+            "downlink": "path/to/downlink1.trace",
+            "queue_params": {
+                "type": "infinite"
+            }
+        },
+        {
+            "delay": 20,
+            "uplink": "path/to/uplink2.trace",
+            "downlink": "path/to/downlink2.trace",
+            "queue_params": {
+                "type": "droptail",
+                "packets": 500
+            }
+        },
+        {
+            "delay": 100,
+            "uplink": "path/to/uplink3.trace",
+            "downlink": "path/to/downlink3.trace",
+            "queue_params": {
+                "type": "codel",
+                "packets": 500,
+                "target": 5,
+                "interval": 100
+            }
+        },
+        {
+            "delay": 50,
+            "uplink": "path/to/uplink4.trace",
+            "downlink": "path/to/downlink4.trace",
+            "queue_params": {
+                "type": "pie",
+                "packets": 500,
+                "qdelay_ref": 5,
+                "max_burst": 100
+            }
+        }
+    ]
+}

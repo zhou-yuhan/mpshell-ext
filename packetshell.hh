@@ -11,6 +11,9 @@
 #include "get_address.hh"
 #include "address.hh"
 #include "dns_proxy.hh"
+#include "json.hh"
+
+using json = nlohmann::json;
 
 class PacketShell
 {
@@ -32,10 +35,14 @@ public:
                        char ** const user_environment,
                        const std::vector<uint64_t> & delays,
                        const std::vector<std::string> & uplinks,
+                       const std::vector<json> & queue_params,
+                       const std::string & log_file,
                        const std::vector< std::string > & command );
 
     void start_downlink( const std::vector<uint64_t> & delays,
-                         const std::vector<std::string> & downlinks);
+                         const std::vector<std::string> & downlinks,
+                         const std::vector<json> & queue_params,
+                         const std::string & log_file);
 
     int wait_on_processes( std::vector<ChildProcess> && process_vector );
     int wait_for_exit() { return wait_on_processes( std::move( child_processes_ ) ); }
