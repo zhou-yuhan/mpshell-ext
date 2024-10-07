@@ -18,3 +18,5 @@ Makefile.in
 /missing
 /mahimahi-*.tar.gz
 /stamp-h1
+
+.vscode/
