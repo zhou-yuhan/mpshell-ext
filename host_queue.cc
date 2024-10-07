@@ -87,7 +87,8 @@ void HostQueue::new_connection(Poller& poller) {
 
     poller.add_action(Poller::Action(fd, Direction::In, [&]() {
         respond(fd);
-        /* client EOF is handled by poller.cc:28 */
+        if (fd.eof())
+            return ResultType::Cancel;
         return ResultType::Continue;
     }));
 
