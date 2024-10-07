@@ -22,7 +22,10 @@ public:
 
     virtual unsigned int size_bytes( void ) const = 0;
     virtual unsigned int size_packets( void ) const = 0;
+
     virtual bool can_accept_one( unsigned int pkt_size ) const = 0;
+
+    virtual QueuedPacket& front( void ) = 0;
 };
 
 #endif /* ABSTRACT_PACKET_QUEUE */ 

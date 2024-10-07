@@ -30,6 +30,18 @@ class RateDelayQueue {
     int wait_time(void) {
         return std::min(delay_queue_.wait_time(), link_queue_.wait_time());
     }
+
+    bool can_accept_one(unsigned int pkt_size) {
+        return link_queue_.can_accept_one(pkt_size);
+    }
+
+    unsigned int size_bytes(void) {
+        return link_queue_.size_bytes();
+    }
+
+    unsigned int size_packets(void) {
+        return link_queue_.size_packets();
+    }
 };
 
 #endif /* RATE_DELAY_QUEUE_HH */

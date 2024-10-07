@@ -59,6 +59,10 @@ public:
     bool finished( void ) const { return finished_; }
     
     bool can_accept_one( unsigned int pkt_size ) const { return packet_queue_->can_accept_one(pkt_size); }
+
+    unsigned int size_packets( void ) const { return packet_queue_->size_packets(); }
+    
+    unsigned int size_bytes( void ) const { return packet_queue_->size_bytes(); }
 };
 
 #endif /* LINK_QUEUE_HH */

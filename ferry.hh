@@ -16,6 +16,7 @@
 #include "child_process.hh"
 #include "dns_proxy.hh"
 #include "http_proxy.hh"
+#include "host_queue.hh"
 
 template <class FerryType>
 int packet_ferry( FerryType & ferry,
@@ -31,4 +32,16 @@ int packet_ferry( FerryType & ferry,
                   std::unique_ptr<DNSProxy> && dns_proxy,
                   ChildProcess && child_process );
 
+/**
+ * An ugly ferry that exposes its internal status to other processes.
+ * An additional fd for serving and reporting queue status is passed
+ * in to the ferry.
+ */
+template <class FerryType>
+int packet_ferry( FerryType & ferry,
+                  FileDescriptor & tun,
+                  FileDescriptor & sibling_fd,
+                  FileDescriptor & server_fd,
+                  std::unique_ptr<DNSProxy> && dns_proxy,
+                  std::vector<ChildProcess> && child_processes );
 #endif /* FERRY_HH */

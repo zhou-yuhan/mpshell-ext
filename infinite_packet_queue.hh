@@ -73,6 +73,12 @@ public:
     {
         return true;
     }
+
+    QueuedPacket& front( void ) override
+    {
+        assert( not internal_queue_.empty() );
+        return internal_queue_.front();
+    }
 };
 
 #endif /* INFINITE_PACKET_QUEUE_HH */ 

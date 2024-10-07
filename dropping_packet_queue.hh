@@ -49,6 +49,8 @@ public:
     unsigned int size_packets( void ) const override;
     
     bool can_accept_one( unsigned int pkt_size ) const override;
+
+    QueuedPacket& front( void ) override;
 };
 
 #endif /* DROPPING_PACKET_QUEUE_HH */ 

@@ -9,6 +9,7 @@
 
 #include "packetshell.hh"
 #include "rate_delay_queue.hh"
+#include "host_queue.hh"
 #include "netdevice.hh"
 #include "nat.hh"
 #include "util.hh"
@@ -105,10 +106,11 @@ void PacketShell::start_uplink( const std::string & shell_prefix,
 
             for (size_t i = 0; i < if_num; ++i) {
                 ChildProcess link_ferry( [&]() {
-                        std::unique_ptr<AbstractPacketQueue> link_queue = get_packet_queue(queue_params.at(i));
-                        assert(link_queue);
-                        RateDelayQueue rate_delay_queue( delays.at(i), uplinks.at(i), log_file, true, move(link_queue));
-                        return packet_ferry( rate_delay_queue, ingress_tuns.at(i).fd(), pipes_.at(i).first, i == 0 ? move( dns_inside ) : nullptr, {} );
+                        HostQueue host_queue(
+                            move(get_packet_queue(queue_params.at(i)["qdisc"])), delays.at(i), uplinks.at(i), log_file, true, 
+                            move(get_packet_queue(queue_params.at(i)["nic"])), i);
+
+                        return packet_ferry( host_queue, ingress_tuns.at(i).fd(), pipes_.at(i).first, host_queue.server_fd(), i == 0 ? move( dns_inside ) : nullptr, {} );
                     } );
                 uplink_processes.emplace_back(move(link_ferry));
             }
@@ -126,8 +128,10 @@ void PacketShell::start_downlink( const std::vector<uint64_t> & delays,
     for (size_t i = 0; i < if_num; ++i) {
         child_processes_.emplace_back( [&] () {
             drop_privileges();
-            std::unique_ptr<AbstractPacketQueue> link_queue = get_packet_queue(queue_params.at(i));
-            RateDelayQueue rate_delay_queue(delays.at(i), downlinks.at(i), log_file, true, move(link_queue));
+            RateDelayQueue rate_delay_queue(
+                delays.at(i), downlinks.at(i), log_file, true, 
+                move(get_packet_queue(queue_params.at(i)["nic"])));
+
             return packet_ferry(rate_delay_queue, egress_tuns_.at(i).fd(), pipes_.at(i).second, i == 0 ? move(dns_outside_) : nullptr, {});
         });
     }

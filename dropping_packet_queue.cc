@@ -95,6 +95,12 @@ bool DroppingPacketQueue::can_accept_one( unsigned int pkt_size ) const
     return ret;
 }
 
+QueuedPacket& DroppingPacketQueue::front( void )
+{
+    assert( not internal_queue_.empty() );
+    return internal_queue_.front();
+}
+
 string DroppingPacketQueue::to_string( void ) const
 {
     string ret = type() + " [";
