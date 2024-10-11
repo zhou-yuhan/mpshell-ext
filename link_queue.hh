@@ -56,6 +56,8 @@ public:
 
     bool pending_output( void ) const;
 
+    std::string get_next( void );
+
     bool finished( void ) const { return finished_; }
     
     bool can_accept_one( unsigned int pkt_size ) const { return packet_queue_->can_accept_one(pkt_size); }
