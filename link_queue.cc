@@ -253,3 +253,13 @@ bool LinkQueue::pending_output( void ) const
 {
     return not output_queue_.empty();
 }
+
+std::string LinkQueue::get_next( void )
+{
+    if (not output_queue_.empty()) {
+        std::string next = output_queue_.front();
+        output_queue_.pop();
+        return next;
+    }
+    return "";
+}

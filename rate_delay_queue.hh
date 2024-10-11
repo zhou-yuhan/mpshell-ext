@@ -22,7 +22,7 @@ class RateDelayQueue {
           link_queue_("link", filename, logfile, repeat, move(packet_queue)) {}
 
     void read_packet(const std::string& contents) {
-        delay_queue_.read_packet(contents);
+        link_queue_.read_packet(contents);
     }
 
     void write_packets(FileDescriptor& fd);
