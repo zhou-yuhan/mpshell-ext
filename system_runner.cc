@@ -38,7 +38,9 @@ void run( const vector< string > & command, char *const envp[] )
 
     /* run with empty environment */
     ChildProcess command_process( [&] () {
-            setuid(geteuid());
+            /* allow iptables to run as root */
+            SystemCall( "setuid", setuid( geteuid() ) );
+
             SystemCall( "execve", execve( &argv[ 0 ][ 0 ], &argv[ 0 ], envp ) );
             return EXIT_FAILURE;
         } );

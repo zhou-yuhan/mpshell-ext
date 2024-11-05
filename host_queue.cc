@@ -67,9 +67,6 @@ void HostQueue::read_packet(const std::string& contents) {
         throw runtime_error("packet size is greater than maximum");
     }
 
-    /* drain qdisc packets if possible */
-    transmit();
-
     unsigned int bytes_before = qdisc_->size_bytes();
     unsigned int packets_before = qdisc_->size_packets();
 
@@ -77,6 +74,9 @@ void HostQueue::read_packet(const std::string& contents) {
 
     assert(qdisc_->size_packets() <= packets_before + 1);
     assert(qdisc_->size_bytes() <= bytes_before + contents.size());
+
+    /* drain qdisc packets if possible */
+    transmit();
 }
 
 void HostQueue::new_connection(Poller& poller) {
