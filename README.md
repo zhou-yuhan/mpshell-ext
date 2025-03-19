@@ -14,14 +14,15 @@ A network host typically consists of a netdev buffer managed by qdisc of Linux k
 Therefore, this tool emulates a network interface by concatenating two queues acting as qdisc and NIC driver, respectively. The qdisc queue only begins to backlog data when the driver queue is full. `hostshell` supports attaching AQM schemes to each queue, note that the qdisc queue is never backlogged if the NIC driver queue is configured to be `infinite` (see usage).
 
 ### Exposing Queue Status
-Sometimes it is useful and convenient to check queue status (i.e. packets/bytes backlogged) of a network interface on a host. `hostshell` provides a UNIX domain socket to provide host queue status to outside. Clients can open `/tmp/unix-hostqueue-[id]` and query queue status of emulated interface `id` with sub-millisecond control delay. `hostshell` accepts any numbers of clients on any interface. Currently the query result is returned immediately in JSON format no matter what the client query format is. A simple example to query queue status is shown below:
+Sometimes it is useful and convenient to check queue status (i.e. packets/bytes backlogged) of a network interface on a host. `hostshell` provides a UNIX domain socket to provide host queue status to outside. Clients can open `/tmp/unix-hostqueue-[id]` and query queue status of emulated interface `id` with sub-millisecond control delay. `hostshell` accepts any numbers of clients on any interface. Currently the query result is returned immediately in binary format no matter what the client query format is. The returned binary format is a `struct QueueStatus` defined in `host_queue.hh`, namely
 ```
-$ nc -U /tmp/unix-hostqueue-0
-<enter>
-{"timestamp": 0, "qdisc_bytes": 0, "qdisc_packets": 0, "nic_bytes": 0, "nic_packets": 0}
-<enter>
-{"timestamp": 0, "qdisc_bytes": 0, "qdisc_packets": 0, "nic_bytes": 0, "nic_packets": 0}
+uint64_t timestamp;
+uint64_t qdisc_bytes;
+uint64_t qdisc_packets;
+uint64_t nic_bytes;
+uint64_t nic_packets;
 ```
+Therefore the client should read the binary data in the order of `timestamp`, `qdisc_bytes`, `qdisc_packets`, `nic_bytes`, `nic_packets`.
 
 ## Build
 ```

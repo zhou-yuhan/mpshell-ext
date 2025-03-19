@@ -55,6 +55,11 @@ public:
     {
         writeall( num(), buffer );
     }
+    
+    int write_buf(const void *buf, size_t len)
+    {
+        return ::write(num(), buf, len);
+    }
 
     std::string::const_iterator write_some( const std::string::const_iterator & begin,
                                             const std::string::const_iterator & end )

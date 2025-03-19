@@ -103,5 +103,18 @@ void HostQueue::respond(FileDescriptor& fd) {
     // FIXME: handle client close
 
     QueueStatus status = get_queue_status();
-    fd.write(status.serialize());
+    // fd.write(status.serialize());
+    uint8_t buf[sizeof(QueueStatus)];
+    int pos = 0;
+    memcpy(buf + pos, &status.timestamp, sizeof(status.timestamp));
+    pos += sizeof(status.timestamp);
+    memcpy(buf + pos, &status.nic_bytes, sizeof(status.nic_bytes));
+    pos += sizeof(status.nic_bytes);
+    memcpy(buf + pos, &status.nic_packets, sizeof(status.nic_packets));
+    pos += sizeof(status.nic_packets);
+    memcpy(buf + pos, &status.qdisc_bytes, sizeof(status.qdisc_bytes));
+    pos += sizeof(status.qdisc_bytes);
+    memcpy(buf + pos, &status.qdisc_packets, sizeof(status.qdisc_packets));
+    pos += sizeof(status.qdisc_packets);
+    fd.write_buf(buf, pos);
 }
