@@ -106,9 +106,17 @@ void PacketShell::start_uplink( const std::string & shell_prefix,
 
             for (size_t i = 0; i < if_num; ++i) {
                 ChildProcess link_ferry( [&]() {
+                        bool has_qdisc = queue_params.at(i).contains("qdisc");
+
+                        if (!has_qdisc) {
+                            RateDelayQueue queue(delays.at(i), uplinks.at(i), log_file, true, get_packet_queue(queue_params.at(i)["nic"]));
+                            return packet_ferry(queue, ingress_tuns.at(i).fd(), pipes_.at(i).first, i == 0 ? move( dns_inside ) : nullptr, {} );
+                        }
+
                         HostQueue host_queue(
-                            move(get_packet_queue(queue_params.at(i)["qdisc"])), delays.at(i), uplinks.at(i), log_file, true, 
-                            move(get_packet_queue(queue_params.at(i)["nic"])), i);
+                            get_packet_queue(queue_params.at(i)["qdisc"]),
+                            delays.at(i), uplinks.at(i), log_file, true,
+                            get_packet_queue(queue_params.at(i)["nic"]), i);
 
                         return packet_ferry( host_queue, ingress_tuns.at(i).fd(), pipes_.at(i).first, host_queue.server_fd(), i == 0 ? move( dns_inside ) : nullptr, {} );
                     } );
