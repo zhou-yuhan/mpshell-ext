@@ -3,9 +3,9 @@
 #include "host_queue.hh"
 
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <sys/stat.h>
 
 #include "poller.hh"
 #include "timestamp.hh"
@@ -18,7 +18,8 @@ HostQueue::HostQueue(std::unique_ptr<AbstractPacketQueue>&& qdisc,
                      const std::string& logfile, const bool repeat,
                      std::unique_ptr<AbstractPacketQueue>&& nic_packet_queue,
                      int id)
-    : qdisc_(move(qdisc)),
+    : qdisc_enq_pkts(0),
+      qdisc_(move(qdisc)),
       nic_(s_delay_ms, filename, logfile, repeat, move(nic_packet_queue)),
       id_(id),
       server_fd_(SystemCall("socket", ::socket(AF_UNIX, SOCK_STREAM, 0))),
@@ -77,21 +78,22 @@ void HostQueue::read_packet(const std::string& contents) {
 
     assert(qdisc_->size_packets() <= packets_before + 1);
     assert(qdisc_->size_bytes() <= bytes_before + contents.size());
+
+    qdisc_enq_pkts++;
 }
 
 void HostQueue::new_connection(Poller& poller) {
     int client_sock =
         SystemCall("accept", accept(server_fd_.num(), nullptr, nullptr));
-    client_fds_.push_back(unique_ptr<FileDescriptor>(new FileDescriptor(client_sock)));
+    client_fds_.push_back(
+        unique_ptr<FileDescriptor>(new FileDescriptor(client_sock)));
     FileDescriptor& fd = *client_fds_.back();
 
     poller.add_action(Poller::Action(fd, Direction::In, [&]() {
         respond(fd);
-        if (fd.eof())
-            return ResultType::Cancel;
+        if (fd.eof()) return ResultType::Cancel;
         return ResultType::Continue;
     }));
-
 }
 
 void HostQueue::respond(FileDescriptor& fd) {
@@ -112,9 +114,17 @@ void HostQueue::respond(FileDescriptor& fd) {
     pos += sizeof(status.nic_bytes);
     memcpy(buf + pos, &status.nic_packets, sizeof(status.nic_packets));
     pos += sizeof(status.nic_packets);
+    memcpy(buf + pos, &status.nic_enq_pkts, sizeof(status.nic_enq_pkts));
+    pos += sizeof(status.nic_enq_pkts);
+    memcpy(buf + pos, &status.nic_deq_pkts, sizeof(status.nic_deq_pkts));
+    pos += sizeof(status.nic_deq_pkts);
     memcpy(buf + pos, &status.qdisc_bytes, sizeof(status.qdisc_bytes));
     pos += sizeof(status.qdisc_bytes);
     memcpy(buf + pos, &status.qdisc_packets, sizeof(status.qdisc_packets));
     pos += sizeof(status.qdisc_packets);
+    memcpy(buf + pos, &status.qdisc_enq_pkts, sizeof(status.qdisc_enq_pkts));
+    pos += sizeof(status.qdisc_enq_pkts);
     fd.write_buf(buf, pos);
+
+    reset_queue_inout();
 }

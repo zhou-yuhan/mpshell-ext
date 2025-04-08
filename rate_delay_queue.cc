@@ -8,6 +8,7 @@ void RateDelayQueue::write_packets( FileDescriptor & fd ) {
     while ( not next_packet.empty() ) {
         delay_queue_.read_packet( next_packet );
         next_packet = link_queue_.get_next();
+        link_deq_pkts++;
     }
 
     /* Write out packets from delay_queue_ into fd */

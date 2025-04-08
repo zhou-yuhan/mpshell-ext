@@ -11,6 +11,8 @@
 class RateDelayQueue {
     /* Delay Queue followed by link queue in series */
    private:
+    uint64_t link_enq_pkts;
+    uint64_t link_deq_pkts;
     DelayQueue delay_queue_;
     LinkQueue link_queue_;
 
@@ -18,11 +20,14 @@ class RateDelayQueue {
     RateDelayQueue(const uint64_t& s_delay_ms, const std::string& filename,
                    const std::string& logfile, const bool repeat,
                    std::unique_ptr<AbstractPacketQueue>&& packet_queue)
-        : delay_queue_(s_delay_ms),
+        : link_enq_pkts(0),
+          link_deq_pkts(0),
+          delay_queue_(s_delay_ms),
           link_queue_("link", filename, logfile, repeat, move(packet_queue)) {}
 
     void read_packet(const std::string& contents) {
         link_queue_.read_packet(contents);
+        link_enq_pkts++;
     }
 
     void write_packets(FileDescriptor& fd);
@@ -35,13 +40,18 @@ class RateDelayQueue {
         return link_queue_.can_accept_one(pkt_size);
     }
 
-    unsigned int size_bytes(void) {
-        return link_queue_.size_bytes();
+    unsigned int size_bytes(void) { return link_queue_.size_bytes(); }
+
+    unsigned int size_packets(void) { return link_queue_.size_packets(); }
+
+    void reset_queue_inout(void) {
+        link_enq_pkts = 0;
+        link_deq_pkts = 0;
     }
 
-    unsigned int size_packets(void) {
-        return link_queue_.size_packets();
-    }
+    uint64_t enq_pkts(void) { return link_enq_pkts; }
+
+    uint64_t deq_pkts(void) { return link_deq_pkts; }
 };
 
 #endif /* RATE_DELAY_QUEUE_HH */
