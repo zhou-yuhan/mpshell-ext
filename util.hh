@@ -32,5 +32,15 @@ PollerShortNames::Result handle_signal( const signalfd_siginfo & sig,
 void assert_not_root( void );
 std::unique_ptr<AbstractPacketQueue> get_packet_queue(const nlohmann::json & params);
 void get_config(const char * filename, std::vector<uint64_t> & delays, std::vector<std::string> & uplinks, std::vector<std::string> & downlinks, std::vector<nlohmann::json> & queue_params, std::string & log_file);
+void hexdump(const char *desc, const uint8_t *data, int len);
+int packet_info(const std::string &packet, uint16_t *src_port, uint32_t *src_ip);
+
+struct FlowStats {
+   public:
+    uint64_t bytes;
+    uint64_t pkts;
+    FlowStats() : bytes(0), pkts(0) {}
+    FlowStats(uint64_t b, uint64_t p) : bytes(b), pkts(p) {}
+};
 
 #endif /* UTIL_HH */

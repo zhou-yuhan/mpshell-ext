@@ -11,6 +11,10 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <arpa/inet.h>
+#include <net/if.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
 
 #include "util.hh"
 #include "exception.hh"
@@ -292,5 +296,52 @@ void get_config(const char * filename, std::vector<uint64_t> & delays, std::vect
         uplinks.emplace_back(if_config["uplink"]);
         downlinks.emplace_back(if_config["downlink"]);
         queue_params.emplace_back(if_config["queue_params"]);
+    }
+}
+
+void hexdump(const char* desc, const uint8_t* data, int len) {
+    printf("%s (%d bytes):\n", desc, len);
+    for (int i = 0; i < len; i++) {
+        printf("%02X ", data[i]);
+        if ((i + 1) % 8 == 0) printf(" ");
+        if ((i + 1) % 16 == 0) printf("\n");
+    }
+    printf("\n\n");
+}
+
+int packet_info(const std::string &packet, uint16_t *src_port, uint32_t *src_ip) {
+    constexpr size_t TUN_ETH_HLEN = 4;
+    if (packet.length() < TUN_ETH_HLEN) {
+        return -1;
+    }
+    uint8_t* buf = (uint8_t*)packet.data();
+    uint16_t *proto = (uint16_t*)(&buf[2]);
+    struct iphdr* ip_header;
+    switch (ntohs(*proto)) {
+        case 0x0800: // IPv4
+            ip_header = (struct iphdr*)(buf + TUN_ETH_HLEN);
+            *src_ip = ip_header->saddr;
+            if (ip_header->protocol == IPPROTO_TCP) {
+                struct tcphdr *tcp_header =
+                (struct tcphdr *)(buf + TUN_ETH_HLEN + sizeof(struct iphdr));
+                *src_port = ntohs(tcp_header->source);
+            } else if (ip_header->protocol == IPPROTO_UDP) {
+                struct udphdr *udp_header = (struct udphdr *)(buf + TUN_ETH_HLEN + sizeof(struct iphdr));
+                *src_port = ntohs(udp_header->source);
+            } else {
+                fprintf(stderr, "Unsupported IP protocol: 0x%02x\n", ip_header->protocol);
+                *src_port = 0;
+            }
+            return 0;
+        case 0x86dd: // IPv6
+            // FIXME: support IPv6 packets
+            *src_ip = 0;
+            *src_port = 0;
+            return 0;
+        default:
+            fprintf(stderr, "Unsupported protocol: %04x\n", ntohs(*proto));
+            *src_ip = 0;
+            *src_port = 0;
+            return -1;
     }
 }

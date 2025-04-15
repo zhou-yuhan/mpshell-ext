@@ -10,6 +10,7 @@
 #include "poller.hh"
 #include "rate_delay_queue.hh"
 #include "timestamp.hh"
+#include "util.hh"
 
 using json = nlohmann::json;
 
@@ -17,7 +18,11 @@ class HostQueue {
     /** HostQueue consists of an AbstractPacketQueue acting as Qdisc and a
      * RateDelayQueue acting as NIC/driver bottleneck */
    private:
-    uint64_t qdisc_enq_pkts;
+    uint64_t qdisc_enq_pkts_;
+    std::unordered_map<uint16_t, FlowStats>
+        flow_mem_stats_;  // emulate sk_wmem_alloc for each flow
+    std::unordered_map<uint16_t, FlowStats>
+        flow_deq_stats_;  // Qdisc dequeued stats for each flow
     std::unique_ptr<AbstractPacketQueue> qdisc_;
     RateDelayQueue nic_;
 
@@ -30,6 +35,11 @@ class HostQueue {
     /* Analogy to ndo_start_xmit() in Linux kernel, transmit packets from netdev
      * qdisc to NIC driver */
     void transmit(void);
+
+    void respond_qdisc_deq(FileDescriptor& fd);
+    void respond_qdisc_size(FileDescriptor& fd);
+    void respond_sock_mem(FileDescriptor& fd, uint16_t port);
+    void respond_full_info(FileDescriptor& fd);
 
     void respond(FileDescriptor& fd);
 
@@ -69,7 +79,7 @@ class HostQueue {
 
     QueueStatus get_queue_status(void) {
         return QueueStatus(timestamp(), qdisc_->size_bytes(),
-                           qdisc_->size_packets(), qdisc_enq_pkts,
+                           qdisc_->size_packets(), qdisc_enq_pkts_,
                            nic_.size_bytes(), nic_.size_packets(),
                            nic_.enq_pkts(), nic_.deq_pkts());
     }
@@ -107,7 +117,7 @@ class HostQueue {
 
     void reset_queue_inout(void) {
         nic_.reset_queue_inout();
-        qdisc_enq_pkts = 0;
+        qdisc_enq_pkts_ = 0;
     }
 };
 
